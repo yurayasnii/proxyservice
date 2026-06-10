@@ -12,7 +12,7 @@ import {
 
 interface Notification {
   _id: string; type: string; title: string; body: string; isRead: boolean; createdAt: string
-  meta?: { orderId?: string; total?: number; ipCount?: number; productName?: string; duration?: string; quantity?: number }
+  meta?: { orderId?: string; total?: number; ipCount?: number; productName?: string; duration?: string; quantity?: number; txId?: string; amount?: number; currency?: string; method?: string }
 }
 interface Me {
   username: string; email: string; avatarUrl?: string; balance: number; role: string
@@ -328,6 +328,42 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                       e.stopPropagation()
                                       await fetch('/api/v1/auth/refresh', { method: 'POST' })
                                       window.open(`/api/v1/orders/${n.meta!.orderId}/receipt`, '_blank')
+                                    }}
+                                    style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: 600, color: '#888', background: 'rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: '5px', border: 'none', cursor: 'pointer', transition: 'all 0.12s' }}
+                                    onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#FFFFFF'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.12)' }}
+                                    onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#888'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.06)' }}
+                                  >
+                                    <Download style={{ width: '9px', height: '9px' }} /> Чек
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : n.type === 'deposit_receipt' ? (
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              <Receipt style={{ width: '13px', height: '13px', color: '#22C55E' }} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                <p style={{ fontSize: '12px', fontWeight: 600, color: '#FFFFFF' }}>{n.title}</p>
+                                {!n.isRead && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />}
+                              </div>
+                              {n.meta?.amount != null && (
+                                <span style={{ fontSize: '10px', fontFamily: 'JetBrains Mono, monospace', color: '#22C55E', background: 'rgba(34,197,94,0.1)', padding: '1px 6px', borderRadius: '4px', display: 'inline-block', marginTop: '5px' }}>
+                                  +${(n.meta.amount as number).toFixed(2)}
+                                </span>
+                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '6px' }}>
+                                <p style={{ fontSize: '10px', color: '#555' }}>
+                                  {new Date(n.createdAt).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                                {n.meta?.txId && (
+                                  <button
+                                    onClick={async (e) => {
+                                      e.stopPropagation()
+                                      await fetch('/api/v1/auth/refresh', { method: 'POST' })
+                                      window.open(`/api/v1/billing/receipt?txId=${n.meta!.txId}`, '_blank')
                                     }}
                                     style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '10px', fontWeight: 600, color: '#888', background: 'rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: '5px', border: 'none', cursor: 'pointer', transition: 'all 0.12s' }}
                                     onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#FFFFFF'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.12)' }}

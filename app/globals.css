@@ -304,8 +304,8 @@
 /* ─── Keyframes ──────────────────────────────────────────────────────────── */
 
 @keyframes dot-breathe {
-  0%, 100% { opacity: 0.06; }
-  50%       { opacity: 0.32; }
+  0%, 100% { opacity: 0.25; r: 0.7; }
+  50%       { opacity: 0.85; r: 1.1; }
 }
 
 @keyframes border-spin {

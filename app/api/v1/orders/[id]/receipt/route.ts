@@ -3,8 +3,8 @@ import { connectDB } from '@/lib/db/connect'
 import Order from '@/lib/models/Order'
 import ProxyProduct from '@/lib/models/ProxyProduct'
 import User from '@/lib/models/User'
-import { requireAuth } from '@/lib/utils/auth'
-import { unauthorized } from '@/lib/utils/response'
+import { verifyAccessToken, verifyRefreshToken, signAccessToken } from '@/lib/utils/jwt'
+import type { JWTPayload } from '@/types'
 import mongoose from 'mongoose'
 
 const DURATION_LABELS: Record<string, string> = {
@@ -18,9 +18,21 @@ const PAYMENT_LABELS: Record<string, string> = {
   ton: 'TON', ltc: 'Litecoin',
 }
 
+function authFromRequest(req: NextRequest): { payload: JWTPayload; newAccessToken?: string } {
+  const access = req.cookies.get('access_token')?.value
+  if (access) {
+    try { return { payload: verifyAccessToken(access) } } catch {}
+  }
+  const refresh = req.cookies.get('refresh_token')?.value
+  if (!refresh) throw new Error('No token provided')
+  const payload = verifyRefreshToken(refresh)
+  const newAccessToken = signAccessToken({ userId: payload.userId, email: payload.email, role: payload.role })
+  return { payload, newAccessToken }
+}
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const payload = requireAuth(req)
+    const { payload, newAccessToken } = authFromRequest(req)
     const { id } = await params
     await connectDB()
 
@@ -94,6 +106,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       font-family: -apple-system, 'Inter', 'Segoe UI', sans-serif;
       background: #EBEBEC;
       color: #18181B;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
 
     body {
@@ -250,10 +264,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     /* ── PRINT ── */
     @media print {
-      body { background: #FFF; padding: 0; justify-content: flex-start; }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      body { display: block !important; background: #EBEBEC !important; padding: 8mm !important; margin: 0 !important; min-height: 0 !important; height: auto !important; }
       .toolbar { display: none !important; }
-      .receipt { box-shadow: none; border-radius: 0; max-width: 100%; }
-      @page { size: A4 landscape; margin: 10mm 12mm; }
+      .receipt { box-shadow: none !important; border-radius: 6px !important; max-width: 100% !important; width: 100% !important; }
+      .rh { background: #18181B !important; }
+      .meta-strip { background: #111 !important; }
+      .customer-box { background: #F8F8F9 !important; }
+      @page { size: A4 landscape; margin: 0; }
     }
   </style>
 </head>
@@ -437,15 +455,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 </body>
 </html>`
 
-    return new Response(html, {
-      status: 200,
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'private, no-cache',
-      },
+    const headers = new Headers({
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'private, no-cache',
     })
+    if (newAccessToken) {
+      headers.append('Set-Cookie', `access_token=${newAccessToken}; HttpOnly; SameSite=Strict; Max-Age=${15 * 60}; Path=/`)
+    }
+    return new Response(html, { status: 200, headers })
   } catch (err) {
-    if ((err as Error).message === 'No token provided') return unauthorized()
+    const msg = (err as Error).message
+    if (msg === 'No token provided' || msg?.includes('jwt')) {
+      return new Response('{"success":false,"error":"Unauthorized"}', { status: 401, headers: { 'Content-Type': 'application/json' } })
+    }
     return new Response('Помилка сервера', { status: 500 })
   }
 }

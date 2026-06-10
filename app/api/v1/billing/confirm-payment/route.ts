@@ -5,6 +5,7 @@ import { connectDB } from '@/lib/db/connect'
 import User from '@/lib/models/User'
 import Transaction from '@/lib/models/Transaction'
 import Notification from '@/lib/models/Notification'
+import redis from '@/lib/utils/redis'
 import { requireAuth } from '@/lib/utils/auth'
 import { ok, error, unauthorized, serverError } from '@/lib/utils/response'
 
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     user.balance  = mongoose.Types.Decimal128.fromString(newBal.toFixed(8))
     await user.save()
 
-    await Transaction.create({
+    const tx = await Transaction.create({
       userId:    user._id,
       type:      'deposit',
       amount:    mongoose.Types.Decimal128.fromString(amount.toFixed(8)),
@@ -42,13 +43,35 @@ export async function POST(req: NextRequest) {
       description: `Поповнення ${method === 'card' ? 'карткою' : 'криптовалютою'}: $${amount}`,
     })
 
-    await Notification.create({
+    const notif = await Notification.create({
       userId: user._id,
-      type:   'deposit',
-      title:  '✅ Баланс поповнено',
-      body:   `+$${amount} зараховано на ваш рахунок.`,
+      type:   'deposit_receipt',
+      title:  'Баланс поповнено',
+      body:   `+$${amount.toFixed(2)} зараховано на рахунок`,
       isRead: false,
+      meta: {
+        txId:     tx._id.toString(),
+        amount,
+        currency: method === 'card' ? 'USD' : currency,
+        method,
+        newBalance: newBal,
+      },
     })
+
+    try {
+      await redis.publish(`user:${user._id}:events`, JSON.stringify({
+        type: 'notification',
+        notification: {
+          _id:       notif._id.toString(),
+          type:      notif.type,
+          title:     notif.title,
+          body:      notif.body,
+          isRead:    false,
+          createdAt: notif.createdAt,
+          meta:      notif.meta,
+        },
+      }))
+    } catch {}
 
     return ok({ newBalance: newBal, amount, message: `$${amount} зараховано` })
   } catch (err) {
