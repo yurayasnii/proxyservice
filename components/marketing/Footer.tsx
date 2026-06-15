@@ -116,11 +116,6 @@ export default function Footer() {
           <p style={{ fontSize: '12px', color: '#CCCCCC' }}>
             © {new Date().getFullYear()} ProxyService
           </p>
-          <p style={{ fontSize: '12px', color: '#555555' }}>
-            Built by{' '}
-            <span style={{ color: '#AAAAAA', fontWeight: 600 }}>yurayasnii</span>
-            {' '}· Full-Stack Developer · Next.js · MongoDB · Node.js
-          </p>
         </div>
       </div>
     </footer>
