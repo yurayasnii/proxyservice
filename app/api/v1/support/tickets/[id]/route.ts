@@ -33,11 +33,14 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const payload = requireAuth(req)
     const { id } = await params
     const body = await req.json()
+    const isAdmin = payload.role === 'admin'
 
     // Close ticket action
     if (body.action === 'close') {
       await connectDB()
-      const ticket = await SupportTicket.findOne({ _id: id, userId: payload.userId })
+      const ticket = isAdmin
+        ? await SupportTicket.findById(id)
+        : await SupportTicket.findOne({ _id: id, userId: payload.userId })
       if (!ticket) return notFound('Ticket not found')
       ticket.status = 'closed'
       await ticket.save()
@@ -48,6 +51,19 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     if (!parsed.success) return error(parsed.error.issues[0]?.message ?? "Validation error")
 
     await connectDB()
+
+    // Admin reply: append directly, bypass AI flow and ownership check
+    if (isAdmin && body.role === 'admin') {
+      const ticket = await SupportTicket.findById(id)
+      if (!ticket) return notFound('Ticket not found')
+      if (ticket.status === 'closed') return error('Ticket is closed')
+
+      ticket.messages.push({ role: 'admin', content: parsed.data.message } as typeof ticket.messages[0])
+      if (ticket.status === 'pending_human') ticket.status = 'open'
+      await ticket.save()
+
+      return ok({ ticket })
+    }
 
     const ticket = await SupportTicket.findOne({ _id: id, userId: payload.userId })
     if (!ticket) return notFound('Ticket not found')

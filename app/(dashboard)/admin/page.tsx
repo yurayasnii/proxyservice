@@ -308,6 +308,7 @@ export default function AdminPage() {
   const [supportTotal,        setSupportTotal]        = useState(0)
   const [openedTicket,        setOpenedTicket]        = useState<string | null>(null)
   const [deletingTicket,      setDeletingTicket]      = useState<string | null>(null)
+  const [closingTicket,       setClosingTicket]       = useState<string | null>(null)
   const [replyText,           setReplyText]           = useState('')
   const [sendingReply,        setSendingReply]        = useState(false)
   const [ticketAction,        setTicketAction]        = useState<'orders'|'refund'|'ban'|'proxy'|null>(null)
@@ -1699,6 +1700,28 @@ export default function AdminPage() {
                       <p style={{ fontSize: '11px', color: '#444' }}>({({proxy_not_working:'Проксі не працює',slow_speed:'Повільна швидкість',wrong_geo:'Геолокація',payment_issue:'Оплата',refund_request:'Повернення',other:'Інше'} as Record<string,string>)[tk.category] ?? tk.category}) · відкрито {fmtDate(tk.createdAt)}</p>
                     </div>
                     <span style={{ fontSize: '10px', fontWeight: 700, color: statusColor[tk.status] ?? '#888' }}>{tk.status}</span>
+                    {tk.status !== 'closed' && (
+                      <button disabled={closingTicket === tk._id}
+                        onClick={async () => {
+                          if (!confirm('Закрити цей тікет?')) return
+                          setClosingTicket(tk._id)
+                          try {
+                            const res = await fetch(`/api/v1/support/tickets/${tk._id}`, {
+                              method: 'POST', headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ action: 'close' }),
+                            })
+                            const data = await res.json()
+                            if (data.success) {
+                              toast.success('Тікет закрито')
+                              loadSupport(supportPage, supportStatusFilter)
+                              loadStats()
+                            } else toast.error(data.error)
+                          } finally { setClosingTicket(null) }
+                        }}
+                        style={{ width: '30px', height: '30px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(34,197,94,0.08)', color: '#22C55E', flexShrink: 0, opacity: closingTicket === tk._id ? 0.6 : 1 }}>
+                        {closingTicket === tk._id ? <Loader2 style={{ width: '12px', height: '12px' }} className="animate-spin" /> : <Check style={{ width: '12px', height: '12px' }} />}
+                      </button>
+                    )}
                     <button disabled={deletingTicket === tk._id}
                       onClick={async () => {
                         if (!confirm('Видалити цей тікет назавжди?')) return
