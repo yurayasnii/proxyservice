@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useState, useRef, useCallback } from 'react'
-import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   Users, Globe, ShoppingCart, MessageSquare, TrendingUp, DollarSign,
@@ -308,6 +307,7 @@ export default function AdminPage() {
   const [supportPages,        setSupportPages]        = useState(1)
   const [supportTotal,        setSupportTotal]        = useState(0)
   const [openedTicket,        setOpenedTicket]        = useState<string | null>(null)
+  const [deletingTicket,      setDeletingTicket]      = useState<string | null>(null)
   const [replyText,           setReplyText]           = useState('')
   const [sendingReply,        setSendingReply]        = useState(false)
   const [ticketAction,        setTicketAction]        = useState<'orders'|'refund'|'ban'|'proxy'|null>(null)
@@ -763,15 +763,14 @@ export default function AdminPage() {
 
       {/* Alert */}
       {stats.pendingHumanTickets > 0 && (
-        <Link href="/support">
-          <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.06)', borderRadius: '10px', borderLeft: '2px solid #EF4444', cursor: 'pointer', transition: 'background 0.15s' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.06)')}>
-            <p style={{ fontSize: '13px', fontWeight: 500, color: '#EF4444' }}>
-              ⚠️ {stats.pendingHumanTickets} тікет(ів) очікує оператора — перейти до підтримки →
-            </p>
-          </div>
-        </Link>
+        <div onClick={() => { setActiveTab('support'); setSupportStatusFilter('pending_human'); setSupportPage(1); loadSupport(1, 'pending_human') }}
+          style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.06)', borderRadius: '10px', borderLeft: '2px solid #EF4444', cursor: 'pointer', transition: 'background 0.15s' }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'rgba(239,68,68,0.06)')}>
+          <p style={{ fontSize: '13px', fontWeight: 500, color: '#EF4444' }}>
+            ⚠️ {stats.pendingHumanTickets} тікет(ів) очікує оператора — перейти до тікетів →
+          </p>
+        </div>
       )}
 
       {/* Tabs */}
@@ -1700,6 +1699,25 @@ export default function AdminPage() {
                       <p style={{ fontSize: '11px', color: '#444' }}>({({proxy_not_working:'Проксі не працює',slow_speed:'Повільна швидкість',wrong_geo:'Геолокація',payment_issue:'Оплата',refund_request:'Повернення',other:'Інше'} as Record<string,string>)[tk.category] ?? tk.category}) · відкрито {fmtDate(tk.createdAt)}</p>
                     </div>
                     <span style={{ fontSize: '10px', fontWeight: 700, color: statusColor[tk.status] ?? '#888' }}>{tk.status}</span>
+                    <button disabled={deletingTicket === tk._id}
+                      onClick={async () => {
+                        if (!confirm('Видалити цей тікет назавжди?')) return
+                        setDeletingTicket(tk._id)
+                        try {
+                          const res = await fetch(`/api/v1/admin/support/${tk._id}`, { method: 'DELETE' })
+                          const data = await res.json()
+                          if (data.success) {
+                            toast.success('Тікет видалено')
+                            setSupportTickets(prev => prev.filter(t => t._id !== tk._id))
+                            setSupportTotal(prev => Math.max(0, prev - 1))
+                            setOpenedTicket(null)
+                            loadStats()
+                          } else toast.error(data.error)
+                        } finally { setDeletingTicket(null) }
+                      }}
+                      style={{ width: '30px', height: '30px', borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(239,68,68,0.08)', color: '#EF4444', flexShrink: 0, opacity: deletingTicket === tk._id ? 0.6 : 1 }}>
+                      {deletingTicket === tk._id ? <Loader2 style={{ width: '12px', height: '12px' }} className="animate-spin" /> : <Trash2 style={{ width: '12px', height: '12px' }} />}
+                    </button>
                   </div>
 
                   <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '460px' }}>
